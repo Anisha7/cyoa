@@ -3,7 +3,9 @@ package cyoa
 import (
 	"encoding/json"
 	"io"
+	"log"
 	"net/http"
+	"strings"
 	"text/template"
 )
 
@@ -47,10 +49,24 @@ type handler struct {
 }
 
 func (h handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	err := tpl.Execute(w, h.s["intro"])
-	if err != nil {
-		panic(err) // not a good idea, print err instead
+	path := strings.TrimSpace(r.URL.Path) // check for which chapter we are on
+	if path == "" || path == "/" {
+		// no path = start with intro
+		path = "/intro"
 	}
+	// "/intro" --> "intro"
+	path = path[1:]
+	// ok checks if we actually found chapter in the map
+	if chapter, ok := h.s[path]; ok {
+		// redirect to path
+		err := tpl.Execute(w, chapter)
+		if err != nil {
+			log.Printf("%v", err)
+			http.Error(w, "Something went wrong...", http.StatusInternalServerError)
+		}
+		return
+	}
+	http.Error(w, "Chapter not found.", http.StatusNotFound)
 }
 
 // JsonStory reads/decodes a json object
